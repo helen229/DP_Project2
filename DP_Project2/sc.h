@@ -5,14 +5,14 @@
 
 // the function you need to implement - by defaiult it calls seam_carving_trivial
 bool seam_carving(cv::Mat& in_image, int new_width, int new_height, cv::Mat& out_image);
-
-
+void calculateGradient(cv::Mat& input, cv::Mat& gradient);
+//void gradientToseam(cv::Mat& Image, std::vector<vector<int>>& seamMat, std::vector<vector<int>>& visitedPath);
 bool seam_carving_trivial(cv::Mat& in_image, int new_width, int new_height, cv::Mat& out_image);
 
 bool reduce_horizontal_seam_trivial(cv::Mat& in_image, cv::Mat& out_image);
 
 
-bool reduce_vertical_seam_trivial(cv::Mat& in_image, cv::Mat& out_image);
+//bool reduce_vertical_seam_trivial(cv::Mat& in_image, cv::Mat& out_image);
 
 
 

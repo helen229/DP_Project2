@@ -61,12 +61,11 @@ void calculateGradient(Mat& input, Mat& gradient) {
 	/// Total Gradient (approximate)
 	addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, gradient);
 
-	//imshow("gd", gradient);
+	//imshow("imput", input);
 	//std::cout << "abs_grad_x = " << std::endl << " " << gradient << std::endl << std::endl;
 }
 
-
-void gradientToseam(Mat& Image, vector<vector<int>>& seamMat)
+void gradientToseam(Mat& Image, vector<vector<int>>& seamMat, vector<vector<int>>& visitedPath)
 {
 	int channels = Image.channels();
 	int nRows = Image.rows;
@@ -89,6 +88,7 @@ void gradientToseam(Mat& Image, vector<vector<int>>& seamMat)
 			pixelList.push_back(ptr[j]);
 		}
 		seamMat.push_back(pixelList);
+		visitedPath.push_back(pixelList);
 	}
 }
 
@@ -105,10 +105,10 @@ bool seam_carving_trivial(Mat& in_image, int new_width, int new_height, Mat& out
 			iimage = oimage.clone();
 		}
 
-		if (iimage.cols>new_width) {
-			reduce_vertical_seam_trivial(iimage, oimage);
-			iimage = oimage.clone();
-		}
+		//if (iimage.cols>new_width) {
+		//	reduce_vertical_seam_trivial(iimage, oimage);
+		//	iimage = oimage.clone();
+		//}
 	}
 
 	out_image = oimage.clone();
@@ -123,21 +123,48 @@ bool reduce_horizontal_seam_trivial(Mat& in_image, Mat& out_image) {
 	int rows = in_image.rows - 1;
 	int cols = in_image.cols;
 	vector<vector<int>> seamMat;
+	vector<vector<int>> visitedPath;
 	Mat gradientMat;
-
-	calculateGradient(in_image, gradientMat);
-	gradientToseam(gradientMat, seamMat);
+	Mat input;
+	input = in_image.clone();
+	calculateGradient(input, gradientMat);
+	gradientToseam(gradientMat, seamMat, visitedPath);
 	//std::cout << "M = " << endl << " " << gradientMat << endl << endl;
 	for (int col = 1; col<in_image.cols; col++) {
 		for (int row = 0; row<in_image.rows; row++) {
 			if (row == 0) {
-				seamMat[row][col] += min(seamMat[row + 1][col - 1], seamMat[row][col - 1]);
+				if (seamMat[row + 1][col - 1]> seamMat[row][col - 1]) {
+					seamMat[row][col] += seamMat[row][col - 1]; 
+					visitedPath[row][col] = row;
+				}
+				else {
+					seamMat[row][col] += seamMat[row+1][col - 1];
+					visitedPath[row][col] = row+1;
+				}
 			}
 			else if (row == in_image.rows - 1) {
-				seamMat[row][col] += min(seamMat[row][col - 1], seamMat[row - 1][col - 1]);
+				if (seamMat[row - 1][col - 1]> seamMat[row][col - 1]) {
+					seamMat[row][col] += seamMat[row][col - 1];
+					visitedPath[row][col] = row;
+				}
+				else {
+					seamMat[row][col] += seamMat[row - 1][col - 1];
+					visitedPath[row][col] = row-1;
+				}
 			}
 			else {
-				seamMat[row][col] += min(seamMat[row + 1][col - 1], min(seamMat[row][col - 1], seamMat[row - 1][col - 1]));
+				int temp;
+				temp = min(seamMat[row + 1][col - 1], min(seamMat[row][col - 1], seamMat[row - 1][col - 1]));
+				seamMat[row][col] += temp;
+				if (temp == seamMat[row + 1][col - 1]) {
+					visitedPath[row][col] = row + 1;
+				}
+				else if (temp == seamMat[row][col - 1]) {
+					visitedPath[row][col] = row;
+				}
+				else {
+					visitedPath[row][col] = row - 1;
+				}
 			}
 		}
 	}
@@ -152,83 +179,73 @@ bool reduce_horizontal_seam_trivial(Mat& in_image, Mat& out_image) {
 		}
 	}
 
+	//get the min path from the visitedPath
+	//for (int i = 0; i < in_image.row; ++i) {
+
+	//}
+
+
 	// create an image slighly smaller
 	out_image = Mat(rows, cols, CV_8UC3);
 
 	//populate the image
-	int middle = in_image.rows / 2;
+	int cutRow= minRow;
+	for (int j = cols-1; j>1;j--) {
 
-	for (int i = 0; i <= middle; ++i)
-		for (int j = 0; j<cols; ++j) {
+	    for (int i = 0; i < cutRow; i++) {
 			Vec3b pixel = in_image.at<Vec3b>(i, j);
-
-			/* at operator is r/w
-			pixel[0] = 255;
-			pixel[1] =255;
-			pixel[2]=255;
-			*/
-
-
-
 			out_image.at<Vec3b>(i, j) = pixel;
 		}
 
-	for (int i = middle + 1; i<rows; ++i)
-		for (int j = 0; j<cols; ++j) {
-			Vec3b pixel = in_image.at<Vec3b>(i + 1, j);
-
-			/* at operator is r/w
-			pixel[0] --> red
-			pixel[1] --> green
-			pixel[2] --> blue
-			*/
-
-
+		for (int i = cutRow; i < rows; i++) {
+			Vec3b pixel = in_image.at<Vec3b>(i+1, j);
 			out_image.at<Vec3b>(i, j) = pixel;
 		}
+		cutRow = visitedPath[cutRow][j];
+	}
 
 	return true;
 }
 
 // vertical trivial seam is a seam through the center of the image
-bool reduce_vertical_seam_trivial(Mat& in_image, Mat& out_image) {
-	// retrieve the dimensions of the new image
-	int rows = in_image.rows;
-	int cols = in_image.cols - 1;
-
-	// create an image slighly smaller
-	out_image = Mat(rows, cols, CV_8UC3);
-
-	//populate the image
-	int middle = in_image.cols / 2;
-
-	for (int i = 0; i<rows; ++i)
-		for (int j = 0; j <= middle; ++j) {
-			Vec3b pixel = in_image.at<Vec3b>(i, j);
-
-			/* at operator is r/w
-			pixel[0] --> red
-			pixel[1] --> green
-			pixel[2] --> blue
-			*/
-
-
-			out_image.at<Vec3b>(i, j) = pixel;
-		}
-
-	for (int i = 0; i<rows; ++i)
-		for (int j = middle + 1; j<cols; ++j) {
-			Vec3b pixel = in_image.at<Vec3b>(i, j + 1);
-
-			/* at operator is r/w
-			pixel[0] --> red
-			pixel[1] --> green
-			pixel[2] --> blue
-			*/
-
-
-			out_image.at<Vec3b>(i, j) = pixel;
-		}
-
-	return true;
-}
+//bool reduce_vertical_seam_trivial(Mat& in_image, Mat& out_image) {
+//	// retrieve the dimensions of the new image
+//	int rows = in_image.rows;
+//	int cols = in_image.cols - 1;
+//
+//	// create an image slighly smaller
+//	out_image = Mat(rows, cols, CV_8UC3);
+//
+//	//populate the image
+//	int middle = in_image.cols / 2;
+//
+//	for (int i = 0; i<rows; ++i)
+//		for (int j = 0; j <= middle; ++j) {
+//			Vec3b pixel = in_image.at<Vec3b>(i, j);
+//
+//			/* at operator is r/w
+//			pixel[0] --> red
+//			pixel[1] --> green
+//			pixel[2] --> blue
+//			*/
+//
+//
+//			out_image.at<Vec3b>(i, j) = pixel;
+//		}
+//
+//	for (int i = 0; i<rows; ++i)
+//		for (int j = middle + 1; j<cols; ++j) {
+//			Vec3b pixel = in_image.at<Vec3b>(i, j + 1);
+//
+//			/* at operator is r/w
+//			pixel[0] --> red
+//			pixel[1] --> green
+//			pixel[2] --> blue
+//			*/
+//
+//
+//			out_image.at<Vec3b>(i, j) = pixel;
+//		}
+//
+//	return true;
+//}
