@@ -1,6 +1,6 @@
 #include "sc.h"
-//#include <iostream>
-//#include <chrono>
+#include <iostream>
+#include <chrono>
 using namespace cv;
 using namespace std;
 
@@ -330,3 +330,4 @@ bool reduce_vertical_seam_trivial(Mat& in_image, Mat& out_image) {
 
 	return true;
 }
+//单独水平左边有花点
